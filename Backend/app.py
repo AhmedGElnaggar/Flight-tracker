@@ -11,15 +11,24 @@ OPENSKY_URL = "https://opensky-network.org/api/states/all"
 AVIATIONSTACK_KEY = "7f7c992ad50d95ca8125d641ade6f981"
 
 # Cache to avoid hitting OpenSky twice per page load
-_cache = {'data': [], 'timestamp': 0}
-CACHE_TTL = 120  # 2 minutes between requests
+_cache = {'data': [], 'timestamp': 0, 'last_attempt': 0}
+CACHE_TTL = 120  # 2 minutes between successful fetches
+RETRY_WAIT = 300  # 5 minutes between failed attempts
 
 def get_flights():
     global _cache
     now = time.time()
+
+    # Return cached data if fresh
     if now - _cache['timestamp'] < CACHE_TTL and _cache['data']:
         return _cache['data']
-    # If we have stale data and it's been less than 10 seconds since last attempt, don't retry
+
+    # Don't retry too soon after a failure
+    if not _cache['data'] and now - _cache['last_attempt'] < RETRY_WAIT:
+        print(f"Waiting before retry... {int(RETRY_WAIT - (now - _cache['last_attempt']))}s remaining")
+        return []
+
+    _cache['last_attempt'] = now
     try:
         res = requests.get(OPENSKY_URL, timeout=15)
         res.raise_for_status()
@@ -37,12 +46,11 @@ def get_flights():
                     "heading": s[10] or 0,
                     "on_ground": s[8]
                 })
-        _cache = {'data': flights, 'timestamp': now}
+        _cache = {'data': flights, 'timestamp': now, 'last_attempt': now}
         print(f"Fetched {len(flights)} flights from OpenSky")
         return flights
     except Exception as e:
         print(f"OpenSky error: {e}")
-        _cache['timestamp'] = now  # prevent immediate retry even on failure
         return _cache['data']
 
 @app.route("/")
