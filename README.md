@@ -36,7 +36,7 @@ A real-time flight tracking web application built with Python Flask and Leaflet.
 
 ```
 flight-tracker/
-├── Backend/
+├── app/
 │   ├── app.py              # Flask backend — API routes and data fetching
 │   └── templates/
 │       └── index.html      # Full frontend — map, stats, flight tracker UI
@@ -57,7 +57,7 @@ flight-tracker/
 ```bash
 # Clone the repo
 git clone https://github.com/AhmedGElnaggar/Flight-tracker.git
-cd Flight-tracker/Backend
+cd Flight-tracker/app
 
 # Install dependencies
 pip install flask flask-cors requests pandas
