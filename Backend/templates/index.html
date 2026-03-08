@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>AE — Flight Tracker</title>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        :root {
+            --bg: #0a0c0f;
+            --surface: #111318;
+            --surface2: #1a1d24;
+            --border: rgba(255,255,255,0.06);
+            --text: #f0f2f5;
+            --muted: #4a5060;
+            --accent: #00d4ff;
+            --accent2: #0066ff;
+            --green: #00e676;
+            --red: #ff4444;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family:'Syne',sans-serif;
+            background:var(--bg);
+            color:var(--text);
+            height:100vh;
+            overflow:hidden;
+            display:flex;
+            flex-direction:column;
+        }
+        .topbar {
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            padding:0 20px;
+            height:52px;
+            background:rgba(10,12,15,0.95);
+            border-bottom:1px solid var(--border);
+            backdrop-filter:blur(20px);
+            position:relative;
+            z-index:1000;
+            flex-shrink:0;
+        }
+        .logo {
+            display:flex;
+            align-items:center;
+            gap:10px;
+            font-size:0.95rem;
+            font-weight:700;
+            letter-spacing:0.05em;
+            text-transform:uppercase;
+        }
+        .logo-dot {
+            width:8px; height:8px;
+            background:var(--accent);
+            border-radius:50%;
+            box-shadow:0 0 8px var(--accent);
+            animation:pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%,100%{opacity:1;transform:scale(1)}
+            50%{opacity:0.5;transform:scale(1.3)}
+        }
+        .live-badge { display:flex; align-items:center; gap:20px; }
+        .live-stat { text-align:right; }
+        .live-stat-val {
+            font-family:'DM Mono',monospace;
+            font-size:1rem;
+            font-weight:500;
+            color:var(--green);
+            text-shadow:0 0 12px rgba(0,230,118,0.4);
+        }
+        .live-stat-label {
+            font-size:0.6rem;
+            color:var(--muted);
+            text-transform:uppercase;
+            letter-spacing:0.1em;
+        }
+        .divider { width:1px; height:28px; background:var(--border); }
+        .main { display:flex; flex-direction:column; flex:1; overflow:hidden; }
+        .map-section { position:relative; flex:1; min-height:0; }
+        #map { width:100%; height:100%; }
+        .map-search {
+            position:absolute;
+            top:16px;
+            left:50%;
+            transform:translateX(-50%);
+            z-index:500;
+            display:flex;
+            align-items:center;
+            background:rgba(10,12,15,0.92);
+            border:1px solid var(--border);
+            border-radius:40px;
+            padding:6px 6px 6px 16px;
+            backdrop-filter:blur(20px);
+            box-shadow:0 8px 32px rgba(0,0,0,0.5);
+            width:340px;
+        }
+        .map-search input {
+            background:transparent; border:none; outline:none;
+            color:var(--text); font-family:'Syne',sans-serif;
+            font-size:0.85rem; flex:1;
+        }
+        .map-search input::placeholder { color:var(--muted); }
+        .map-search-btn {
+            width:32px; height:32px; border:none; border-radius:50%;
+            background:var(--accent2); color:#fff; cursor:pointer;
+            display:flex; align-items:center; justify-content:center;
+            font-size:14px; transition:all 0.2s;
+        }
+        .map-search-btn:hover { background:var(--accent); }
+        .compass {
+            position:absolute; bottom:16px; left:16px; z-index:500;
+            width:40px; height:40px;
+            background:rgba(10,12,15,0.9);
+            border:1px solid var(--border);
+            border-radius:50%;
+            display:flex; align-items:center; justify-content:center;
+            font-size:18px; backdrop-filter:blur(10px);
+            cursor:pointer; transition:transform 0.3s;
+        }
+        .compass:hover { background:rgba(0,212,255,0.1); }
+        .flight-count-overlay {
+            position:absolute; top:16px; right:16px; z-index:500;
+            background:rgba(10,12,15,0.92);
+            border:1px solid rgba(0,212,255,0.2);
+            border-radius:12px; padding:10px 16px;
+            backdrop-filter:blur(20px); text-align:center;
+        }
+        .fco-val {
+            font-family:'DM Mono',monospace; font-size:1.4rem; font-weight:500;
+            color:var(--accent); text-shadow:0 0 16px rgba(0,212,255,0.5);
+        }
+        .fco-label { font-size:0.6rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.1em; margin-top:2px; }
+        .bottom-panel {
+            height:220px; display:flex; background:var(--bg);
+            border-top:1px solid var(--border); flex-shrink:0;
+        }
+        .flights-panel {
+            width:340px; border-right:1px solid var(--border);
+            display:flex; flex-direction:column; flex-shrink:0;
+        }
+        .panel-header {
+            display:flex; align-items:center; justify-content:space-between;
+            padding:10px 16px; border-bottom:1px solid var(--border);
+        }
+        .panel-title {
+            font-size:0.72rem; font-weight:700;
+            text-transform:uppercase; letter-spacing:0.1em; color:var(--muted);
+        }
+        .panel-badge {
+            font-family:'DM Mono',monospace; font-size:0.68rem;
+            color:var(--accent); background:rgba(0,212,255,0.08);
+            border:1px solid rgba(0,212,255,0.15);
+            padding:2px 8px; border-radius:20px;
+        }
+        .flights-list {
+            flex:1; overflow-y:auto;
+            scrollbar-width:thin; scrollbar-color:var(--surface2) transparent;
+        }
+        .flights-list::-webkit-scrollbar { width:3px; }
+        .flights-list::-webkit-scrollbar-thumb { background:var(--surface2); border-radius:3px; }
+        .flight-item {
+            display:flex; align-items:center; gap:10px;
+            padding:8px 16px; border-bottom:1px solid var(--border);
+            cursor:pointer; transition:background 0.15s;
+        }
+        .flight-item:hover { background:var(--surface); }
+        .flight-item:last-child { border-bottom:none; }
+        .airline-logo {
+            width:30px; height:30px; border-radius:8px;
+            background:var(--surface2);
+            display:flex; align-items:center; justify-content:center;
+            font-size:11px; font-weight:700;
+            flex-shrink:0; font-family:'DM Mono',monospace;
+            border:1px solid var(--border);
+        }
+        .flight-details { flex:1; min-width:0; }
+        .flight-callsign { font-size:0.8rem; font-weight:700; font-family:'DM Mono',monospace; }
+        .flight-route { font-size:0.68rem; color:var(--muted); margin-top:1px; }
+        .flight-meta { text-align:right; }
+        .flight-alt { font-family:'DM Mono',monospace; font-size:0.75rem; color:var(--accent); }
+        .flight-spd { font-size:0.65rem; color:var(--muted); margin-top:1px; }
+        .center-panel {
+            flex:1; display:flex; flex-direction:column;
+            border-right:1px solid var(--border);
+        }
+        .refresh-btn {
+            margin:12px 16px;
+            padding:10px; border:1px dashed rgba(0,212,255,0.2);
+            border-radius:10px; background:rgba(0,212,255,0.03);
+            color:var(--muted); font-family:'Syne',sans-serif;
+            font-size:0.75rem; cursor:pointer; transition:all 0.2s;
+            display:flex; align-items:center; justify-content:center; gap:6px;
+            text-transform:uppercase; letter-spacing:0.08em;
+        }
+        .refresh-btn:hover { border-color:rgba(0,212,255,0.4); color:var(--accent); background:rgba(0,212,255,0.06); }
+        .mini-stats {
+            display:grid; grid-template-columns:1fr 1fr;
+            gap:8px; padding:0 16px 12px; flex:1;
+        }
+        .mini-stat {
+            background:var(--surface); border:1px solid var(--border);
+            border-radius:10px; padding:8px 12px;
+        }
+        .mini-stat-val { font-family:'DM Mono',monospace; font-size:1rem; font-weight:500; color:var(--green); }
+        .mini-stat-label { font-size:0.6rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em; margin-top:2px; }
+        .route-panel {
+            width:420px; flex-shrink:0;
+            display:flex; flex-direction:column;
+            padding:12px 16px; gap:8px;
+        }
+        .route-label { font-size:0.68rem; text-transform:uppercase; letter-spacing:0.1em; color:var(--muted); font-weight:700; }
+        .route-search-btn {
+            width:100%; padding:10px; border:none; border-radius:10px;
+            background:linear-gradient(135deg,var(--accent2),var(--accent));
+            color:#fff; font-family:'Syne',sans-serif;
+            font-size:0.78rem; font-weight:700; cursor:pointer;
+            text-transform:uppercase; letter-spacing:0.08em; transition:opacity 0.2s;
+        }
+        .route-search-btn:hover { opacity:0.85; }
+        .tracked-flights { display:flex; flex-direction:column; gap:6px; flex:1; overflow-y:auto; }
+        .tracked-item {
+            background:var(--surface); border:1px solid var(--border);
+            border-radius:12px; padding:10px 12px;
+        }
+        .tracked-top {
+            display:flex; align-items:center; justify-content:space-between;
+            margin-bottom:8px;
+        }
+        .tracked-callsign {
+            font-family:'DM Mono',monospace; font-size:0.85rem; font-weight:700;
+            color:var(--text);
+        }
+        .tracked-status {
+            font-size:0.65rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em;
+        }
+        .tracked-remove {
+            background:none; border:none; color:var(--muted);
+            cursor:pointer; font-size:12px; padding:0 2px;
+            transition:color 0.2s;
+        }
+        .tracked-remove:hover { color:var(--red); }
+        .progress-track {
+            position:relative; height:6px;
+            background:var(--surface2); border-radius:99px;
+            overflow:visible; margin:0 4px;
+        }
+        .progress-fill {
+            height:100%; border-radius:99px;
+            background:linear-gradient(90deg,var(--accent2),var(--accent));
+            transition:width 1s ease;
+            box-shadow:0 0 8px rgba(0,212,255,0.4);
+        }
+        .progress-plane {
+            position:absolute; top:50%;
+            transform:translate(-50%,-50%);
+            font-size:14px; color:var(--accent);
+            text-shadow:0 0 8px rgba(0,212,255,0.8);
+            transition:left 1s ease;
+            pointer-events:none;
+            filter:drop-shadow(0 0 4px rgba(0,212,255,0.6));
+        }
+        .progress-labels {
+            display:flex; justify-content:space-between;
+            margin-top:5px;
+            font-family:'DM Mono',monospace; font-size:0.65rem; color:var(--muted);
+        }
+        /* MODAL */
+        .modal-overlay {
+            display:none; position:fixed; inset:0;
+            background:rgba(0,0,0,0.7); backdrop-filter:blur(6px);
+            z-index:2000; align-items:center; justify-content:center;
+        }
+        .modal-overlay.open { display:flex; }
+        .modal {
+            background:var(--surface); border:1px solid var(--border);
+            border-radius:20px; padding:28px; width:360px;
+            box-shadow:0 24px 64px rgba(0,0,0,0.6);
+            animation:slideUp 0.25s ease;
+        }
+        @keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+        .modal-title { font-size:1rem; font-weight:700; margin-bottom:20px; }
+        .modal-row { display:flex; align-items:center; gap:10px; margin-bottom:16px; }
+        .modal-input {
+            flex:1; background:var(--surface2); border:1px solid var(--border);
+            border-radius:10px; padding:12px 14px; color:var(--text);
+            font-family:'DM Mono',monospace; font-size:1rem; font-weight:600;
+            outline:none; text-align:center; text-transform:uppercase;
+            transition:border-color 0.2s;
+        }
+        .modal-input:focus { border-color:rgba(0,212,255,0.4); }
+        .modal-input::placeholder { color:var(--muted); font-size:0.8rem; font-weight:400; text-transform:none; }
+        .modal-plane-icon { font-size:22px; color:var(--accent); flex-shrink:0; }
+        .modal-actions { display:flex; gap:10px; margin-top:4px; }
+        .modal-cancel {
+            flex:1; padding:10px; border:1px solid var(--border);
+            border-radius:10px; background:transparent; color:var(--muted);
+            font-family:'Syne',sans-serif; font-size:0.8rem; cursor:pointer;
+            transition:all 0.2s;
+        }
+        .modal-cancel:hover { border-color:var(--muted); color:var(--text); }
+        .modal-confirm {
+            flex:2; padding:10px; border:none; border-radius:10px;
+            background:linear-gradient(135deg,var(--accent2),var(--accent));
+            color:#fff; font-family:'Syne',sans-serif; font-size:0.8rem;
+            font-weight:700; cursor:pointer; transition:opacity 0.2s;
+        }
+        .modal-confirm:hover { opacity:0.85; }
+        .leaflet-container { background:#0a0c0f !important; }
+        .leaflet-popup-content-wrapper {
+            background:var(--surface) !important; color:var(--text) !important;
+            border:1px solid var(--border) !important; border-radius:10px !important;
+            font-family:'Syne',sans-serif !important; font-size:12px !important;
+        }
+        .leaflet-popup-tip { background:var(--surface) !important; }
+        .leaflet-control-zoom a {
+            background:rgba(10,12,15,0.9) !important;
+            color:var(--text) !important; border-color:var(--border) !important;
+        }
+        .empty { color:var(--muted); font-size:0.75rem; text-align:center; padding:20px; }
+        @keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
+        .flight-item { animation:fadeIn 0.3s ease; }
+    </style>
+</head>
+<body>
+
+<div class="topbar">
+    <div class="logo"><div class="logo-dot"></div>AE Flight Tracker</div>
+    <div class="live-badge">
+        <div class="live-stat">
+            <div class="live-stat-val" id="h-total">—</div>
+            <div class="live-stat-label">Live Flights</div>
+        </div>
+        <div class="divider"></div>
+        <div class="live-stat">
+            <div class="live-stat-val" id="h-airborne">—</div>
+            <div class="live-stat-label">Airborne</div>
+        </div>
+        <div class="divider"></div>
+        <div class="live-stat">
+            <div class="live-stat-val" id="h-speed">—</div>
+            <div class="live-stat-label">Avg Speed</div>
+        </div>
+    </div>
+</div>
+
+<div class="main">
+    <div class="map-section">
+        <div id="map"></div>
+        <div class="map-search">
+            <input id="map-search-input" placeholder="Search flight or aircraft..."/>
+            <button class="map-search-btn" onclick="searchFlight()">⌕</button>
+        </div>
+        <div class="flight-count-overlay">
+            <div class="fco-val" id="map-count">—</div>
+            <div class="fco-label">On Map</div>
+        </div>
+        <div class="compass" onclick="resetMap()">🧭</div>
+    </div>
+
+    <div class="bottom-panel">
+        <div class="flights-panel">
+            <div class="panel-header">
+                <div class="panel-title">✈ Live Flights</div>
+                <div class="panel-badge" id="flight-badge">0</div>
+            </div>
+            <div class="flights-list" id="flight-list">
+                <div class="empty">Loading flights...</div>
+            </div>
+        </div>
+
+        <div class="center-panel">
+            <button class="refresh-btn" onclick="refreshData()">⟳ Refresh Data</button>
+            <div class="mini-stats">
+                <div class="mini-stat"><div class="mini-stat-val" id="s-total">—</div><div class="mini-stat-label">Total</div></div>
+                <div class="mini-stat"><div class="mini-stat-val" id="s-airborne">—</div><div class="mini-stat-label">Airborne</div></div>
+                <div class="mini-stat"><div class="mini-stat-val" id="s-alt">—</div><div class="mini-stat-label">Avg Alt (m)</div></div>
+                <div class="mini-stat"><div class="mini-stat-val" id="s-vel">—</div><div class="mini-stat-label">Avg Speed</div></div>
+            </div>
+        </div>
+
+        <div class="route-panel">
+            <div class="panel-header" style="padding:10px 0 10px 0;margin-bottom:8px">
+                <div class="panel-title">🛫 Tracked Flights</div>
+                <button class="route-search-btn" style="width:auto;padding:4px 14px;font-size:0.7rem" onclick="openModal()">+ Add Flight</button>
+            </div>
+            <div class="tracked-flights" id="tracked-flights">
+                <div class="empty" style="padding:12px">No tracked flights yet</div>
+            </div>
+        </div>
+
+        <!-- ADD FLIGHT MODAL -->
+        <div class="modal-overlay" id="modal-overlay">
+            <div class="modal">
+                <div class="modal-title">✈ Track a Flight</div>
+                <div class="modal-row">
+                    <input class="modal-input" id="modal-flight" placeholder="e.g. QR350 or EK204" maxlength="8" style="text-align:left;padding-left:16px"/>
+                </div>
+                <div style="font-size:0.72rem;color:var(--muted);margin-bottom:12px;margin-top:-8px">Enter the flight number (IATA or ICAO format)</div>
+                <div id="modal-error" style="font-size:0.75rem;color:var(--red);margin-bottom:8px;min-height:16px"></div>
+                <div class="modal-actions">
+                    <button class="modal-cancel" onclick="closeModal()">Cancel</button>
+                    <button class="modal-confirm" id="modal-confirm" onclick="addTrackedFlight()">Track Flight</button>
+                </div>
+            </div>
+        </div>
+
+
+    </div>
+</div>
+
+<script>
+    let allFlights = [];
+    let markers = [];
+
+    let map = L.map('map', { zoomControl: true }).setView([20, 0], 2);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '© OpenStreetMap © CARTO', maxZoom: 19
+    }).addTo(map);
+
+    L.marker([31.9, 35.2], {
+        icon: L.divIcon({
+            html: '<div style="background:rgba(0,0,0,0.8);color:#f0f2f5;padding:3px 8px;border-radius:6px;font-family:Syne,sans-serif;font-size:11px;font-weight:700;white-space:nowrap;border:1px solid rgba(255,255,255,0.15)">🇵🇸 Palestine</div>',
+            className: '', iconAnchor: [45, 10]
+        }), interactive: false
+    }).addTo(map);
+
+    const planeIcon = (heading) => L.divIcon({
+        html: `<div style="transform:rotate(${heading}deg);font-size:14px;color:#00d4ff;text-shadow:0 0 6px rgba(0,212,255,0.8);line-height:1">✈</div>`,
+        className: '', iconSize: [18, 18], iconAnchor: [9, 9]
+    });
+
+    function getAirlineColor(callsign) {
+        const colors = ['#00d4ff','#0066ff','#00e676','#ffaa00','#ff6b6b','#a78bfa'];
+        let hash = 0;
+        for (let c of (callsign || '')) hash = c.charCodeAt(0) + hash * 31;
+        return colors[Math.abs(hash) % colors.length];
+    }
+
+    async function loadFlights() {
+        document.getElementById('flight-list').innerHTML = '<div class="empty">Fetching live flights...</div>';
+        try {
+            const res = await fetch('/api/flights');
+            if (!res.ok) throw new Error('API error ' + res.status);
+            allFlights = await res.json();
+            if (!Array.isArray(allFlights)) throw new Error('Bad data');
+            renderFlights(allFlights);
+            renderMap(allFlights);
+            document.getElementById('h-total').textContent = allFlights.length.toLocaleString();
+            document.getElementById('flight-badge').textContent = allFlights.length.toLocaleString();
+            document.getElementById('map-count').textContent = Math.min(allFlights.length, 500).toLocaleString();
+        } catch(e) {
+            console.error('Could not load flights', e);
+            document.getElementById('flight-list').innerHTML = '<div class="empty">⚠ API rate limited — retrying in 30s</div>';
+        }
+    }
+
+    async function loadStats() {
+        try {
+            const res = await fetch('/api/stats');
+            if (!res.ok) throw new Error('API error');
+            const data = await res.json();
+            document.getElementById('s-total').textContent = (data.total_flights || 0).toLocaleString();
+            document.getElementById('s-airborne').textContent = (data.airborne || 0).toLocaleString();
+            document.getElementById('s-alt').textContent = (data.avg_altitude || 0).toLocaleString();
+            document.getElementById('s-vel').textContent = (data.avg_velocity || 0).toLocaleString();
+            document.getElementById('h-airborne').textContent = (data.airborne || 0).toLocaleString();
+            document.getElementById('h-speed').textContent = (data.avg_velocity || 0) + ' m/s';
+        } catch(e) { console.error('Could not load stats', e); }
+    }
+
+    function renderFlights(flights) {
+        const list = document.getElementById('flight-list');
+        if (!flights.length) { list.innerHTML = '<div class="empty">No flights found</div>'; return; }
+        list.innerHTML = flights.slice(0, 40).map(f => {
+            const code = f.callsign ? f.callsign.slice(0,3).toUpperCase() : '???';
+            const color = getAirlineColor(f.callsign);
+            return `<div class="flight-item" onclick="focusFlight(${f.latitude},${f.longitude})">
+                <div class="airline-logo" style="color:${color};border-color:${color}33">${code}</div>
+                <div class="flight-details">
+                    <div class="flight-callsign">${f.callsign}</div>
+                    <div class="flight-route">${f.origin_country}</div>
+                </div>
+                <div class="flight-meta">
+                    <div class="flight-alt">${Math.round(f.altitude)}m</div>
+                    <div class="flight-spd">${Math.round(f.velocity)} m/s</div>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function renderMap(flights) {
+        markers.forEach(m => map.removeLayer(m));
+        markers = [];
+        flights.slice(0, 500).forEach(f => {
+            const m = L.marker([f.latitude, f.longitude], {icon: planeIcon(f.heading || 0)})
+                .bindPopup(`<b>${f.callsign}</b><br>${f.origin_country}<br>${Math.round(f.altitude)}m · ${Math.round(f.velocity)} m/s`);
+            m.addTo(map);
+            markers.push(m);
+        });
+    }
+
+    function focusFlight(lat, lng) { map.flyTo([lat, lng], 7, {duration:1.5}); }
+    function resetMap() { map.flyTo([20, 0], 2, {duration:1.5}); }
+
+    function searchFlight() {
+        const q = document.getElementById('map-search-input').value.toLowerCase();
+        if (!q) return;
+        const found = allFlights.find(f => f.callsign.toLowerCase().includes(q) || f.origin_country.toLowerCase().includes(q));
+        if (found) map.flyTo([found.latitude, found.longitude], 8, {duration:1.5});
+    }
+
+    let trackedFlights = [];
+
+    function openModal() {
+        document.getElementById('modal-overlay').classList.add('open');
+        document.getElementById('modal-flight').value = '';
+        document.getElementById('modal-error').textContent = '';
+        document.getElementById('modal-confirm').textContent = 'Track Flight';
+        setTimeout(() => document.getElementById('modal-flight').focus(), 100);
+    }
+
+    function closeModal() {
+        document.getElementById('modal-overlay').classList.remove('open');
+    }
+
+    async function addTrackedFlight() {
+        const flight = document.getElementById('modal-flight').value.trim().toUpperCase();
+        const errorEl = document.getElementById('modal-error');
+        const btn = document.getElementById('modal-confirm');
+        if (!flight || flight.length < 3) {
+            errorEl.textContent = 'Please enter a valid flight number';
+            return;
+        }
+        if (trackedFlights.find(f => f.callsign === flight)) {
+            errorEl.textContent = 'Already tracking this flight';
+            return;
+        }
+        btn.textContent = 'Looking up...';
+        btn.disabled = true;
+        errorEl.textContent = '';
+        try {
+            const res = await fetch(`/api/track/${flight}`);
+            const data = await res.json();
+            if (!data.valid) {
+                errorEl.textContent = '✕ Flight not found — check the flight number';
+                btn.textContent = 'Track Flight';
+                btn.disabled = false;
+                return;
+            }
+            trackedFlights.push({
+                callsign: flight,
+                airline: data.airline,
+                status: data.status,
+                dep_iata: data.dep_iata,
+                dep_city: data.dep_city,
+                dep_time: data.dep_time,
+                arr_iata: data.arr_iata,
+                arr_city: data.arr_city,
+                arr_time: data.arr_time,
+                progress: data.progress,
+                found: true
+            });
+            renderTrackedFlights();
+            closeModal();
+        } catch(e) {
+            errorEl.textContent = '✕ Lookup failed — try again';
+            btn.textContent = 'Track Flight';
+            btn.disabled = false;
+        }
+    }
+
+    function removeTrackedFlight(i) {
+        trackedFlights.splice(i, 1);
+        renderTrackedFlights();
+    }
+
+    function renderTrackedFlights() {
+        const el = document.getElementById('tracked-flights');
+        if (!trackedFlights.length) {
+            el.innerHTML = '<div class="empty" style="padding:12px">No tracked flights yet</div>';
+            return;
+        }
+        el.innerHTML = trackedFlights.map((f, i) => {
+            const pct = Math.min(f.progress, 98);
+            const statusColor = f.status === 'landed' ? '#00e676' : f.status === 'active' ? '#00d4ff' : f.status === 'cancelled' ? '#ff4444' : '#ffaa00';
+            const depLabel = `<span>${f.dep_iata || 'DEP'}</span>${f.dep_time ? `<span style="color:var(--accent);margin-left:3px">${f.dep_time}</span>` : ''}`;
+            const arrLabel = `${f.arr_time ? `<span style="color:var(--accent);margin-right:3px">${f.arr_time}</span>` : ''}<span>${f.arr_iata || 'ARR'}</span>`;
+            return `<div class="tracked-item">
+                <div class="tracked-top">
+                    <span class="tracked-callsign">${f.callsign} <span style="font-size:0.7rem;color:var(--muted);font-family:'Syne',sans-serif">${f.airline || ''}</span></span>
+                    <span class="tracked-status" style="color:${statusColor};text-transform:uppercase;font-size:0.68rem">${f.status || 'scheduled'}</span>
+                    <button class="tracked-remove" onclick="removeTrackedFlight(${i})">✕</button>
+                </div>
+                <div class="progress-track">
+                    <div class="progress-fill" style="width:${pct}%"></div>
+                    <div class="progress-plane" style="left:${pct}%">✈</div>
+                </div>
+                <div class="progress-labels">
+                    <span style="display:flex;align-items:center;gap:3px">${depLabel}</span>
+                    <span style="color:var(--accent)">${pct}%</span>
+                    <span style="display:flex;align-items:center;gap:3px">${arrLabel}</span>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    // Update progress for tracked flights every 30s
+    function updateTrackedProgress() {
+        trackedFlights = trackedFlights.map(f => {
+            const live = allFlights.find(l => l.callsign.replace(/\s/g,'') === f.callsign);
+            if (live && f.progress < 98) {
+                f.progress = Math.min(f.progress + Math.random() * 3, 98);
+                f.found = true;
+                f.country = live.origin_country;
+            }
+            return f;
+        });
+        if (trackedFlights.length) renderTrackedFlights();
+    }
+
+    document.getElementById('modal-overlay').addEventListener('click', function(e) {
+        if (e.target === this) closeModal();
+    });
+
+    document.getElementById('modal-flight').addEventListener('keydown', e => {
+        if (e.key === 'Enter') addTrackedFlight();
+    });
+
+    function refreshData() { loadFlights(); loadStats(); updateTrackedProgress(); }
+
+    document.getElementById('map-search-input').addEventListener('keydown', e => { if(e.key==='Enter') searchFlight(); });
+
+    loadFlights();
+    loadStats();
+    setInterval(refreshData, 120000);
+</script>
+</body>
+</html>
