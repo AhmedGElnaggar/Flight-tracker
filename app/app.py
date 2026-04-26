@@ -3,12 +3,16 @@ from flask_cors import CORS
 import requests
 import pandas as pd
 import time
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
 OPENSKY_URL = "https://opensky-network.org/api/states/all"
-AVIATIONSTACK_KEY = "7f7c992ad50d95ca8125d641ade6f981"
+AVIATIONSTACK_KEY = os.getenv("AVIATIONSTACK_KEY", "")
 
 # Cache to avoid hitting OpenSky twice per page load
 _cache = {'data': [], 'timestamp': 0, 'last_attempt': 0}
