@@ -503,10 +503,27 @@
     function resetMap() { map.flyTo([20, 0], 2, {duration:1.5}); }
 
     function searchFlight() {
-        const q = document.getElementById('map-search-input').value.toLowerCase();
+        const q = document.getElementById('map-search-input').value.trim().toUpperCase();
         if (!q) return;
-        const found = allFlights.find(f => f.callsign.toLowerCase().includes(q) || f.origin_country.toLowerCase().includes(q));
-        if (found) map.flyTo([found.latitude, found.longitude], 8, {duration:1.5});
+        const found = allFlights.find(f => 
+            f.callsign.trim().toUpperCase().includes(q) || 
+            f.origin_country.toUpperCase().includes(q)
+        );
+        if (found) {
+            map.flyTo([found.latitude, found.longitude], 8, {duration: 1.5});
+            // Show a brief toast
+            const toast = document.createElement('div');
+            toast.textContent = `✈ Found: ${found.callsign.trim()} (${found.origin_country})`;
+            toast.style.cssText = 'position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#00d4ff;color:#0a0c0f;padding:8px 18px;border-radius:8px;font-size:0.8rem;font-weight:700;z-index:9999;transition:opacity 0.5s';
+            document.body.appendChild(toast);
+            setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 2500);
+        } else {
+            const toast = document.createElement('div');
+            toast.textContent = `✕ No flight found for "${q}"`;
+            toast.style.cssText = 'position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#ff4444;color:#fff;padding:8px 18px;border-radius:8px;font-size:0.8rem;font-weight:700;z-index:9999;transition:opacity 0.5s';
+            document.body.appendChild(toast);
+            setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 2000);
+        }
     }
 
     let trackedFlights = [];
