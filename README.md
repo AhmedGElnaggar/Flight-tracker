@@ -14,7 +14,6 @@ A real-time flight tracking web application built with Python Flask and Leaflet.
 - **Airline Logos** — Airline logo shown when clicking any plane on the map
 - **Flight Tracker** — Add any flight by IATA code (e.g. `QR350`, `EK201`) and track its progress
 - **Progress Bar** — Animated plane progress bar showing departure → arrival with real times and percentage
-- **Palestine Label** — Custom map overlay
 - **Auto Refresh** — Data refreshes every 2 minutes automatically
 
 ---
