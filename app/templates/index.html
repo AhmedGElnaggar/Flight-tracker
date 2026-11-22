@@ -4,7 +4,6 @@
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>AE — Flight Tracker</title>
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
     <script>
         // Apply saved theme before first paint to avoid a flash
         (function () {
@@ -13,42 +12,54 @@
             document.documentElement.setAttribute('data-theme', t);
         })();
     </script>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
+        /* Flat design: solid colors only, no gradients, glows or shadows.
+           All spacing and sizing sits on a 4px grid. */
         :root {
             --bg: #FCFFFF;
             --surface: #FFFFFF;
             --surface2: #EAF6FB;
-            --border: rgba(5,147,198,0.16);
+            --border: rgba(5,147,198,0.24);
             --text: #0B2A38;
-            --muted: #6B8794;
+            --muted: #5F7B88;
             --accent: #0593C6;
             --accent-soft: rgba(5,147,198,0.10);
             --pink: #D83995;
             --pink-soft: rgba(216,57,149,0.10);
             --green: #1FA971;
             --red: #E5484D;
-            --shadow: 0 8px 28px rgba(5,147,198,0.18);
-            --shadow-sm: 0 2px 10px rgba(5,147,198,0.12);
             --map-bg: #EAF6FB;
-            --halo: #FCFFFF;
-            --attr-bg: rgba(252,255,255,0.8);
+            --attr-bg: rgba(252,255,255,0.85);
+
+            /* 4px spacing scale */
+            --s1: 4px;
+            --s2: 8px;
+            --s3: 12px;
+            --s4: 16px;
+            --s5: 20px;
+            --s6: 24px;
+            --s8: 32px;
+
+            /* radii */
+            --r-sm: 8px;
+            --r-md: 12px;
+            --r-lg: 16px;
+            --r-pill: 999px;
         }
         /* DARK MODE: only the white becomes black, blue and pink stay */
         [data-theme="dark"] {
             --bg: #000000;
             --surface: #0B0D0F;
             --surface2: #15191D;
-            --border: rgba(5,147,198,0.28);
+            --border: rgba(5,147,198,0.36);
             --text: #FCFFFF;
             --muted: #8CA0AA;
             --accent-soft: rgba(5,147,198,0.18);
             --pink-soft: rgba(216,57,149,0.18);
-            --shadow: 0 8px 28px rgba(0,0,0,0.7);
-            --shadow-sm: 0 2px 10px rgba(0,0,0,0.6);
             --map-bg: #000000;
-            --halo: #000000;
             --attr-bg: rgba(0,0,0,0.7);
         }
         * { margin:0; padding:0; box-sizing:border-box; }
@@ -67,11 +78,10 @@
             display:flex;
             align-items:center;
             justify-content:space-between;
-            padding:0 22px;
-            height:58px;
+            padding:0 var(--s6);
+            height:56px;
             background:var(--bg);
             border-bottom:1px solid var(--border);
-            box-shadow:var(--shadow-sm);
             position:relative;
             z-index:1000;
             flex-shrink:0;
@@ -79,7 +89,7 @@
         .logo {
             display:flex;
             align-items:center;
-            gap:10px;
+            gap:var(--s3);
             font-size:0.95rem;
             font-weight:800;
             letter-spacing:0.05em;
@@ -88,23 +98,21 @@
         }
         .logo-mark {
             display:flex; align-items:center; justify-content:center;
-            width:30px; height:30px; border-radius:10px;
-            background:linear-gradient(135deg,var(--accent),var(--pink));
+            width:32px; height:32px; border-radius:var(--r-sm);
+            background:var(--accent);
             color:#fff; font-size:0.78rem; font-weight:800; letter-spacing:0.02em;
-            box-shadow:0 4px 12px rgba(216,57,149,0.28);
         }
         .logo-dot {
             width:8px; height:8px;
             background:var(--pink);
             border-radius:50%;
-            box-shadow:0 0 0 4px var(--pink-soft);
             animation:pulse 2s infinite;
         }
         @keyframes pulse {
-            0%,100%{opacity:1;transform:scale(1)}
-            50%{opacity:0.5;transform:scale(1.3)}
+            0%,100%{opacity:1}
+            50%{opacity:0.35}
         }
-        .live-badge { display:flex; align-items:center; gap:20px; }
+        .live-badge { display:flex; align-items:center; gap:var(--s5); }
         .live-stat { text-align:right; }
         .live-stat-val {
             font-family:'DM Mono',monospace;
@@ -119,6 +127,14 @@
             letter-spacing:0.1em;
         }
         .divider { width:1px; height:28px; background:var(--border); }
+        .theme-toggle {
+            width:36px; height:36px; border-radius:50%;
+            border:1px solid var(--border); background:var(--surface);
+            color:var(--accent); font-size:16px; cursor:pointer;
+            display:flex; align-items:center; justify-content:center;
+            transition:color 0.2s, border-color 0.2s;
+        }
+        .theme-toggle:hover { color:var(--pink); border-color:var(--pink); }
 
         /* MAP */
         .main { display:flex; flex-direction:column; flex:1; overflow:hidden; }
@@ -126,7 +142,7 @@
         #map { width:100%; height:100%; }
         .map-search {
             position:absolute;
-            top:16px;
+            top:var(--s4);
             left:50%;
             transform:translateX(-50%);
             z-index:500;
@@ -134,16 +150,12 @@
             align-items:center;
             background:var(--surface);
             border:1px solid var(--border);
-            border-radius:40px;
-            padding:6px 6px 6px 18px;
-            box-shadow:var(--shadow);
+            border-radius:var(--r-pill);
+            padding:var(--s1) var(--s1) var(--s1) var(--s5);
             width:360px;
-            transition:border-color 0.2s, box-shadow 0.2s;
+            transition:border-color 0.2s;
         }
-        .map-search:focus-within {
-            border-color:var(--accent);
-            box-shadow:0 8px 28px rgba(5,147,198,0.28);
-        }
+        .map-search:focus-within { border-color:var(--accent); }
         .map-search input {
             background:transparent; border:none; outline:none;
             color:var(--text); font-family:'Syne',sans-serif;
@@ -151,43 +163,41 @@
         }
         .map-search input::placeholder { color:var(--muted); }
         .map-search-btn {
-            width:34px; height:34px; border:none; border-radius:50%;
+            width:36px; height:36px; border:none; border-radius:50%;
             background:var(--pink); color:#fff; cursor:pointer;
             display:flex; align-items:center; justify-content:center;
-            font-size:15px; transition:all 0.2s;
+            font-size:16px; transition:background 0.2s;
         }
-        .map-search-btn:hover { background:var(--accent); transform:scale(1.06); }
+        .map-search-btn:hover { background:var(--accent); }
         .compass {
-            position:absolute; bottom:16px; left:16px; z-index:500;
-            width:42px; height:42px;
+            position:absolute; bottom:var(--s4); left:var(--s4); z-index:500;
+            width:40px; height:40px;
             background:var(--surface);
             border:1px solid var(--border);
             border-radius:50%;
             display:flex; align-items:center; justify-content:center;
             font-size:18px;
-            box-shadow:var(--shadow-sm);
-            cursor:pointer; transition:all 0.2s;
+            cursor:pointer; transition:background 0.2s;
         }
-        .compass:hover { background:var(--accent-soft); transform:rotate(20deg); }
+        .compass:hover { background:var(--accent-soft); }
         .flight-count-overlay {
-            position:absolute; top:16px; right:16px; z-index:500;
+            position:absolute; top:var(--s4); right:var(--s4); z-index:500;
             background:var(--surface);
             border:1px solid var(--border);
-            border-top:3px solid var(--pink);
-            border-radius:14px; padding:10px 18px;
-            box-shadow:var(--shadow); text-align:center;
+            border-top:4px solid var(--pink);
+            border-radius:var(--r-md); padding:var(--s3) var(--s5);
+            text-align:center;
         }
         .fco-val {
             font-family:'DM Mono',monospace; font-size:1.4rem; font-weight:500;
             color:var(--pink);
         }
-        .fco-label { font-size:0.6rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.1em; margin-top:2px; }
+        .fco-label { font-size:0.6rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.1em; margin-top:var(--s1); }
 
         /* BOTTOM PANEL */
         .bottom-panel {
-            height:230px; display:flex; background:var(--bg);
+            height:256px; display:flex; background:var(--bg);
             border-top:1px solid var(--border);
-            box-shadow:0 -6px 24px rgba(5,147,198,0.10);
             position:relative; z-index:600;
             flex-shrink:0;
         }
@@ -197,7 +207,7 @@
         }
         .panel-header {
             display:flex; align-items:center; justify-content:space-between;
-            padding:11px 16px; border-bottom:1px solid var(--border);
+            padding:var(--s3) var(--s4); border-bottom:1px solid var(--border);
         }
         .panel-title {
             font-size:0.72rem; font-weight:800;
@@ -206,25 +216,25 @@
         .panel-badge {
             font-family:'DM Mono',monospace; font-size:0.68rem;
             color:var(--pink); background:var(--pink-soft);
-            border:1px solid rgba(216,57,149,0.25);
-            padding:2px 9px; border-radius:20px;
+            border:1px solid var(--pink);
+            padding:var(--s1) var(--s2); border-radius:var(--r-pill);
         }
         .flights-list {
             flex:1; overflow-y:auto;
-            scrollbar-width:thin; scrollbar-color:rgba(5,147,198,0.3) transparent;
+            scrollbar-width:thin; scrollbar-color:var(--border) transparent;
         }
         .flights-list::-webkit-scrollbar { width:4px; }
-        .flights-list::-webkit-scrollbar-thumb { background:rgba(5,147,198,0.3); border-radius:3px; }
+        .flights-list::-webkit-scrollbar-thumb { background:var(--border); border-radius:var(--s1); }
         .flight-item {
-            display:flex; align-items:center; gap:10px;
-            padding:8px 16px; border-bottom:1px solid var(--border);
-            border-left:3px solid transparent;
+            display:flex; align-items:center; gap:var(--s3);
+            padding:var(--s2) var(--s4); border-bottom:1px solid var(--border);
+            border-left:4px solid transparent;
             cursor:pointer; transition:background 0.15s, border-color 0.15s;
         }
         .flight-item:hover { background:var(--surface2); border-left-color:var(--pink); }
         .flight-item:last-child { border-bottom:none; }
         .airline-logo {
-            width:32px; height:32px; border-radius:9px;
+            width:32px; height:32px; border-radius:var(--r-sm);
             background:var(--surface);
             display:flex; align-items:center; justify-content:center;
             font-size:11px; font-weight:700;
@@ -233,59 +243,55 @@
         }
         .flight-details { flex:1; min-width:0; }
         .flight-callsign { font-size:0.8rem; font-weight:700; font-family:'DM Mono',monospace; color:var(--text); }
-        .flight-route { font-size:0.68rem; color:var(--muted); margin-top:1px; }
+        .flight-route { font-size:0.68rem; color:var(--muted); margin-top:var(--s1); }
         .flight-meta { text-align:right; }
         .flight-alt { font-family:'DM Mono',monospace; font-size:0.75rem; color:var(--accent); font-weight:500; }
-        .flight-spd { font-size:0.65rem; color:var(--muted); margin-top:1px; }
+        .flight-spd { font-size:0.65rem; color:var(--muted); margin-top:var(--s1); }
         .center-panel {
             flex:1; display:flex; flex-direction:column;
             border-right:1px solid var(--border);
         }
         .refresh-btn {
-            margin:12px 16px;
-            padding:10px; border:1px dashed rgba(5,147,198,0.4);
-            border-radius:12px; background:var(--accent-soft);
+            margin:var(--s3) var(--s4);
+            padding:var(--s3); border:1px dashed var(--accent);
+            border-radius:var(--r-md); background:var(--accent-soft);
             color:var(--accent); font-family:'Syne',sans-serif; font-weight:700;
             font-size:0.75rem; cursor:pointer; transition:all 0.2s;
-            display:flex; align-items:center; justify-content:center; gap:6px;
+            display:flex; align-items:center; justify-content:center; gap:var(--s2);
             text-transform:uppercase; letter-spacing:0.08em;
         }
         .refresh-btn:hover { border-color:var(--pink); color:var(--pink); background:var(--pink-soft); }
         .mini-stats {
             display:grid; grid-template-columns:1fr 1fr;
-            gap:8px; padding:0 16px 12px; flex:1;
+            gap:var(--s2); padding:0 var(--s4) var(--s3); flex:1;
         }
         .mini-stat {
             background:var(--surface); border:1px solid var(--border);
-            border-radius:12px; padding:8px 12px;
-            box-shadow:var(--shadow-sm);
+            border-radius:var(--r-md); padding:var(--s2) var(--s3);
         }
         .mini-stat-val { font-family:'DM Mono',monospace; font-size:1rem; font-weight:500; color:var(--accent); }
-        .mini-stat-label { font-size:0.6rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em; margin-top:2px; }
+        .mini-stat-label { font-size:0.6rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.08em; margin-top:var(--s1); }
         .route-panel {
             width:420px; flex-shrink:0;
             display:flex; flex-direction:column;
-            padding:12px 16px; gap:8px;
+            padding:var(--s3) var(--s4); gap:var(--s2);
         }
-        .route-label { font-size:0.68rem; text-transform:uppercase; letter-spacing:0.1em; color:var(--muted); font-weight:700; }
         .route-search-btn {
-            width:100%; padding:10px; border:none; border-radius:10px;
-            background:linear-gradient(135deg,var(--accent),var(--pink));
+            width:100%; padding:var(--s3); border:none; border-radius:var(--r-sm);
+            background:var(--accent);
             color:#fff; font-family:'Syne',sans-serif;
             font-size:0.78rem; font-weight:700; cursor:pointer;
-            text-transform:uppercase; letter-spacing:0.08em; transition:all 0.2s;
-            box-shadow:0 4px 14px rgba(216,57,149,0.28);
+            text-transform:uppercase; letter-spacing:0.08em; transition:background 0.2s;
         }
-        .route-search-btn:hover { opacity:0.92; transform:translateY(-1px); }
-        .tracked-flights { display:flex; flex-direction:column; gap:8px; flex:1; overflow-y:auto; }
+        .route-search-btn:hover { background:var(--pink); }
+        .tracked-flights { display:flex; flex-direction:column; gap:var(--s2); flex:1; overflow-y:auto; }
         .tracked-item {
             background:var(--surface); border:1px solid var(--border);
-            border-radius:14px; padding:10px 12px;
-            box-shadow:var(--shadow-sm);
+            border-radius:var(--r-md); padding:var(--s3);
         }
         .tracked-top {
             display:flex; align-items:center; justify-content:space-between;
-            margin-bottom:8px;
+            margin-bottom:var(--s2);
         }
         .tracked-callsign {
             font-family:'DM Mono',monospace; font-size:0.85rem; font-weight:700;
@@ -296,108 +302,98 @@
         }
         .tracked-remove {
             background:none; border:none; color:var(--muted);
-            cursor:pointer; font-size:12px; padding:0 2px;
+            cursor:pointer; font-size:12px; padding:0 var(--s1);
             transition:color 0.2s;
         }
         .tracked-remove:hover { color:var(--pink); }
         .progress-track {
-            position:relative; height:6px;
-            background:var(--surface2); border-radius:99px;
-            overflow:visible; margin:0 4px;
+            position:relative; height:8px;
+            background:var(--surface2); border-radius:var(--r-pill);
+            overflow:visible; margin:0 var(--s1);
         }
         .progress-fill {
-            height:100%; border-radius:99px;
-            background:linear-gradient(90deg,var(--accent),var(--pink));
+            height:100%; border-radius:var(--r-pill);
+            background:var(--accent);
             transition:width 1s ease;
         }
         .progress-plane {
             position:absolute; top:50%;
             transform:translate(-50%,-50%);
-            font-size:15px; color:var(--pink);
+            font-size:16px; color:var(--pink);
             transition:left 1s ease;
             pointer-events:none;
-            filter:drop-shadow(0 0 3px var(--halo)) drop-shadow(0 1px 3px rgba(216,57,149,0.5));
         }
         .progress-labels {
             display:flex; justify-content:space-between;
-            margin-top:5px;
+            margin-top:var(--s1);
             font-family:'DM Mono',monospace; font-size:0.65rem; color:var(--muted);
         }
 
         /* MODAL */
         .modal-overlay {
             display:none; position:fixed; inset:0;
-            background:rgba(11,42,56,0.45); backdrop-filter:blur(6px);
+            background:rgba(11,42,56,0.55);
             z-index:2000; align-items:center; justify-content:center;
         }
+        [data-theme="dark"] .modal-overlay { background:rgba(0,0,0,0.7); }
         .modal-overlay.open { display:flex; }
         .modal {
             background:var(--surface); border:1px solid var(--border);
             border-top:4px solid var(--pink);
-            border-radius:20px; padding:28px; width:360px;
-            box-shadow:0 24px 64px rgba(5,147,198,0.30);
+            border-radius:var(--r-lg); padding:var(--s8); width:360px;
             animation:slideUp 0.25s ease;
         }
         @keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
-        .modal-title { font-size:1rem; font-weight:800; margin-bottom:20px; color:var(--text); }
-        .modal-row { display:flex; align-items:center; gap:10px; margin-bottom:16px; }
+        .modal-title { font-size:1rem; font-weight:800; margin-bottom:var(--s5); color:var(--text); }
+        .modal-row { display:flex; align-items:center; gap:var(--s3); margin-bottom:var(--s4); }
         .modal-input {
             flex:1; background:var(--surface2); border:1px solid var(--border);
-            border-radius:12px; padding:12px 14px; color:var(--text);
+            border-radius:var(--r-md); padding:var(--s3) var(--s4); color:var(--text);
             font-family:'DM Mono',monospace; font-size:1rem; font-weight:600;
             outline:none; text-align:center; text-transform:uppercase;
-            transition:border-color 0.2s, box-shadow 0.2s;
+            transition:border-color 0.2s;
         }
-        .modal-input:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+        .modal-input:focus { border-color:var(--accent); }
         .modal-input::placeholder { color:var(--muted); font-size:0.8rem; font-weight:400; text-transform:none; }
-        .modal-plane-icon { font-size:22px; color:var(--accent); flex-shrink:0; }
-        .modal-actions { display:flex; gap:10px; margin-top:4px; }
+        .modal-actions { display:flex; gap:var(--s3); margin-top:var(--s1); }
         .modal-cancel {
-            flex:1; padding:10px; border:1px solid var(--border);
-            border-radius:12px; background:transparent; color:var(--muted);
+            flex:1; padding:var(--s3); border:1px solid var(--border);
+            border-radius:var(--r-md); background:transparent; color:var(--muted);
             font-family:'Syne',sans-serif; font-size:0.8rem; cursor:pointer;
             transition:all 0.2s;
         }
         .modal-cancel:hover { border-color:var(--accent); color:var(--accent); }
         .modal-confirm {
-            flex:2; padding:10px; border:none; border-radius:12px;
-            background:linear-gradient(135deg,var(--accent),var(--pink));
+            flex:2; padding:var(--s3); border:none; border-radius:var(--r-md);
+            background:var(--accent);
             color:#fff; font-family:'Syne',sans-serif; font-size:0.8rem;
-            font-weight:700; cursor:pointer; transition:all 0.2s;
-            box-shadow:0 4px 14px rgba(216,57,149,0.28);
+            font-weight:700; cursor:pointer; transition:background 0.2s;
         }
-        .modal-confirm:hover { opacity:0.92; }
+        .modal-confirm:hover { background:var(--pink); }
         .modal-confirm:disabled { opacity:0.6; cursor:wait; }
 
         /* LEAFLET OVERRIDES */
         .leaflet-container { background:var(--map-bg) !important; font-family:'Syne',sans-serif !important; }
         .leaflet-popup-content-wrapper {
             background:var(--surface) !important; color:var(--text) !important;
-            border:1px solid var(--border) !important; border-radius:12px !important;
+            border:1px solid var(--border) !important; border-radius:var(--r-md) !important;
             font-family:'Syne',sans-serif !important; font-size:12px !important;
-            box-shadow:var(--shadow) !important;
+            box-shadow:none !important;
         }
         .leaflet-popup-content b { color:var(--pink); font-family:'DM Mono',monospace; }
-        .leaflet-popup-tip { background:var(--surface) !important; }
-        .leaflet-control-zoom { border:none !important; box-shadow:var(--shadow-sm) !important; }
+        .leaflet-popup-tip { background:var(--surface) !important; box-shadow:none !important; border:1px solid var(--border); }
+        .leaflet-top .leaflet-control { margin-top:var(--s4); }
+        .leaflet-left .leaflet-control { margin-left:var(--s4); }
+        .leaflet-control-zoom { border:1px solid var(--border) !important; box-shadow:none !important; border-radius:var(--r-sm) !important; overflow:hidden; }
         .leaflet-control-zoom a {
+            width:32px !important; height:32px !important; line-height:32px !important;
             background:var(--surface) !important;
             color:var(--accent) !important; border-color:var(--border) !important;
         }
         .leaflet-control-zoom a:hover { background:var(--accent-soft) !important; color:var(--pink) !important; }
         .leaflet-control-attribution { background:var(--attr-bg) !important; color:var(--muted) !important; }
         .leaflet-control-attribution a { color:var(--accent) !important; }
-
-        /* THEME TOGGLE */
-        .theme-toggle {
-            width:36px; height:36px; border-radius:50%;
-            border:1px solid var(--border); background:var(--surface);
-            color:var(--accent); font-size:16px; cursor:pointer;
-            display:flex; align-items:center; justify-content:center;
-            box-shadow:var(--shadow-sm); transition:all 0.2s;
-        }
-        .theme-toggle:hover { color:var(--pink); border-color:var(--pink); transform:rotate(15deg); }
-        .empty { color:var(--muted); font-size:0.75rem; text-align:center; padding:20px; }
+        .empty { color:var(--muted); font-size:0.75rem; text-align:center; padding:var(--s5); }
         @keyframes fadeIn { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:translateY(0)} }
         .flight-item { animation:fadeIn 0.3s ease; }
     </style>
@@ -462,12 +458,12 @@
         </div>
 
         <div class="route-panel">
-            <div class="panel-header" style="padding:10px 0 10px 0;margin-bottom:8px">
+            <div class="panel-header" style="padding:var(--s3) 0;margin-bottom:var(--s2)">
                 <div class="panel-title">🛫 Tracked Flights</div>
-                <button class="route-search-btn" style="width:auto;padding:5px 14px;font-size:0.7rem" onclick="openModal()">+ Add Flight</button>
+                <button class="route-search-btn" style="width:auto;padding:var(--s1) var(--s4);font-size:0.7rem" onclick="openModal()">+ Add Flight</button>
             </div>
             <div class="tracked-flights" id="tracked-flights">
-                <div class="empty" style="padding:12px">No tracked flights yet</div>
+                <div class="empty" style="padding:var(--s3)">No tracked flights yet</div>
             </div>
         </div>
 
@@ -476,10 +472,10 @@
             <div class="modal">
                 <div class="modal-title">✈ Track a Flight</div>
                 <div class="modal-row">
-                    <input class="modal-input" id="modal-flight" placeholder="e.g. QR350 or EK204" maxlength="8" style="text-align:left;padding-left:16px"/>
+                    <input class="modal-input" id="modal-flight" placeholder="e.g. QR350 or EK204" maxlength="8" style="text-align:left"/>
                 </div>
-                <div style="font-size:0.72rem;color:var(--muted);margin-bottom:12px;margin-top:-8px">Enter the flight number (IATA or ICAO format)</div>
-                <div id="modal-error" style="font-size:0.75rem;color:var(--pink);margin-bottom:8px;min-height:16px"></div>
+                <div style="font-size:0.72rem;color:var(--muted);margin-bottom:var(--s3);margin-top:calc(var(--s2) * -1)">Enter the flight number (IATA or ICAO format)</div>
+                <div id="modal-error" style="font-size:0.75rem;color:var(--pink);margin-bottom:var(--s2);min-height:var(--s4)"></div>
                 <div class="modal-actions">
                     <button class="modal-cancel" onclick="closeModal()">Cancel</button>
                     <button class="modal-confirm" id="modal-confirm" onclick="addTrackedFlight()">Track Flight</button>
@@ -521,11 +517,9 @@
 
     document.getElementById('theme-toggle').textContent = currentTheme() === 'dark' ? '☀' : '☾';
 
-
-
     const planeIcon = (heading) => L.divIcon({
-        html: `<div style="transform:rotate(${heading}deg);font-size:15px;color:#0593C6;text-shadow:0 0 3px var(--halo),0 0 6px var(--halo),0 1px 4px rgba(5,147,198,0.5);line-height:1">✈</div>`,
-        className: '', iconSize: [18, 18], iconAnchor: [9, 9]
+        html: `<div style="transform:rotate(${heading}deg);font-size:16px;color:#0593C6;line-height:1">✈</div>`,
+        className: '', iconSize: [20, 20], iconAnchor: [10, 10]
     });
 
     function getAirlineColor(callsign) {
@@ -604,8 +598,8 @@
     function searchFlight() {
         const q = document.getElementById('map-search-input').value.trim().toUpperCase();
         if (!q) return;
-        const found = allFlights.find(f => 
-            f.callsign.trim().toUpperCase().includes(q) || 
+        const found = allFlights.find(f =>
+            f.callsign.trim().toUpperCase().includes(q) ||
             f.origin_country.toUpperCase().includes(q)
         );
         if (found) {
@@ -613,13 +607,13 @@
             // Show a brief toast
             const toast = document.createElement('div');
             toast.textContent = `✈ Found: ${found.callsign.trim()} (${found.origin_country})`;
-            toast.style.cssText = 'position:fixed;top:76px;left:50%;transform:translateX(-50%);background:#0593C6;color:#FCFFFF;padding:8px 18px;border-radius:10px;font-size:0.8rem;font-weight:700;z-index:9999;box-shadow:0 6px 20px rgba(5,147,198,0.35);transition:opacity 0.5s';
+            toast.style.cssText = 'position:fixed;top:76px;left:50%;transform:translateX(-50%);background:#0593C6;color:#FCFFFF;padding:8px 16px;border-radius:8px;font-size:0.8rem;font-weight:700;z-index:9999;transition:opacity 0.5s';
             document.body.appendChild(toast);
             setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 2500);
         } else {
             const toast = document.createElement('div');
             toast.textContent = `✕ No flight found for "${q}"`;
-            toast.style.cssText = 'position:fixed;top:76px;left:50%;transform:translateX(-50%);background:#D83995;color:#FCFFFF;padding:8px 18px;border-radius:10px;font-size:0.8rem;font-weight:700;z-index:9999;box-shadow:0 6px 20px rgba(216,57,149,0.35);transition:opacity 0.5s';
+            toast.style.cssText = 'position:fixed;top:76px;left:50%;transform:translateX(-50%);background:#D83995;color:#FCFFFF;padding:8px 16px;border-radius:8px;font-size:0.8rem;font-weight:700;z-index:9999;transition:opacity 0.5s';
             document.body.appendChild(toast);
             setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 2000);
         }
@@ -699,8 +693,8 @@
         el.innerHTML = trackedFlights.map((f, i) => {
             const pct = Math.min(f.progress, 98);
             const statusColor = f.status === 'landed' ? '#1FA971' : f.status === 'active' ? '#0593C6' : f.status === 'cancelled' ? '#E5484D' : '#D83995';
-            const depLabel = `<span>${f.dep_iata || 'DEP'}</span>${f.dep_time ? `<span style="color:var(--accent);margin-left:3px">${f.dep_time}</span>` : ''}`;
-            const arrLabel = `${f.arr_time ? `<span style="color:var(--accent);margin-right:3px">${f.arr_time}</span>` : ''}<span>${f.arr_iata || 'ARR'}</span>`;
+            const depLabel = `<span>${f.dep_iata || 'DEP'}</span>${f.dep_time ? `<span style="color:var(--accent);margin-left:4px">${f.dep_time}</span>` : ''}`;
+            const arrLabel = `${f.arr_time ? `<span style="color:var(--accent);margin-right:4px">${f.arr_time}</span>` : ''}<span>${f.arr_iata || 'ARR'}</span>`;
             return `<div class="tracked-item">
                 <div class="tracked-top">
                     <span class="tracked-callsign">${f.callsign} <span style="font-size:0.7rem;color:var(--muted);font-family:'Syne',sans-serif">${f.airline || ''}</span></span>
@@ -712,9 +706,9 @@
                     <div class="progress-plane" style="left:${pct}%">✈</div>
                 </div>
                 <div class="progress-labels">
-                    <span style="display:flex;align-items:center;gap:3px">${depLabel}</span>
+                    <span style="display:flex;align-items:center;gap:4px">${depLabel}</span>
                     <span style="color:var(--pink)">${pct}%</span>
-                    <span style="display:flex;align-items:center;gap:3px">${arrLabel}</span>
+                    <span style="display:flex;align-items:center;gap:4px">${arrLabel}</span>
                 </div>
             </div>`;
         }).join('');
